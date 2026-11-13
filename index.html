@@ -9,7 +9,7 @@
 <meta name="robots" content="noindex">
 <title>Masa Paneli · Canlı (Sanal)</title>
 <link rel="preload" href="InterVariable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305060b'/%3E%3Cpath d='M10 44 L24 30 L34 38 L54 16' stroke='%2337f5a6' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -130,6 +130,31 @@
     <div class="card glass about" id="about"></div>
   </section>
 
+  <!-- DENEY -->
+  <section class="tab" data-tab="deney">
+    <div class="card glass lab-hero">
+      <div class="hero-top"><span class="eyebrow">DENEYSEL — hızlı öğrenme masası (sanal)</span><span class="chip" id="labStatus">—</span></div>
+      <div class="lab-two">
+        <div><label>Solana kitabı</label><b id="labSolEq" class="num">—</b><small id="labSolSub" class="num muted">—</small></div>
+        <div><label>OKX spot+vadeli</label><b id="labOkxEq" class="num">—</b><small id="labOkxSub" class="num muted">—</small></div>
+      </div>
+      <p class="hint" id="labSet"></p>
+      <p class="hint" id="labOSet"></p>
+      <div class="okx-note">Ana masadan ayrı · gevşek filtre, hızlı veri · OKX verisi, Binance değil · emir yok, anahtar yok</div>
+    </div>
+    <div class="sec-h"><h2>Açık pozisyonlar</h2><span class="muted sm" id="labScan"></span></div>
+    <div id="labPos"></div>
+    <div class="sec-h"><h2>Kapanan işlemler</h2></div>
+    <div id="labTrades"></div>
+    <div class="sec-h"><h2>Post-mortem (neden?)</h2><span class="muted sm" id="labCls"></span></div>
+    <div id="labPm"></div>
+    <div class="sec-h"><h2>Kaçırdıklarımız</h2><span class="muted sm" id="labMissTs"></span></div>
+    <div id="labAke"></div>
+    <div id="labMiss"></div>
+    <div class="sec-h"><h2>Hangi kural yakalardı?</h2><span class="muted sm">kaybedenler dahil</span></div>
+    <div id="labRules"></div>
+  </section>
+
   <!-- AKIS -->
   <section class="tab" data-tab="akis">
     <div class="sec-h first"><h2>Uyarılar</h2></div>
@@ -144,6 +169,7 @@
   <button data-go="piyasa"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg><span>Piyasa</span></button>
   <button data-go="spot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 9h4.5a2 2 0 010 4H9h5a2 2 0 010 4H9M11 7v2M11 17v-2"/></svg><span>Spot</span></button>
   <button data-go="ekip"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 4.5a3 3 0 010 6M18 14c2 .8 3 2.8 3 6"/></svg><span>Ekip</span></button>
+  <button data-go="deney"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3M7.5 14h9"/></svg><span>Deney</span></button>
   <button data-go="akis"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>Akış</span></button>
   <i class="nav-ind" id="navInd"></i>
 </nav>
@@ -162,6 +188,6 @@
   <div class="sheet-note" id="shNote"></div>
 </div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

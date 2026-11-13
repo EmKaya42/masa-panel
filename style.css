@@ -185,7 +185,7 @@ main{max-width:1180px;margin:0 auto;padding:14px 16px calc(110px + var(--safe-b)
 .al{padding:11px 14px;border-radius:14px;font-size:12.5px;margin-bottom:8px;color:#ffd5dc;background:rgba(255,77,109,.08);box-shadow:inset 0 0 0 1px rgba(255,77,109,.25);word-break:break-word}
 
 /* nav */
-.nav{position:fixed;left:50%;bottom:calc(12px + var(--safe-b));transform:translateX(-50%);z-index:30;display:grid;grid-template-columns:repeat(5,1fr);width:min(460px,calc(100% - 24px));padding:6px;border-radius:24px;background:rgba(14,16,30,.78);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 20px 40px -10px rgba(0,0,0,.8)}
+.nav{position:fixed;left:50%;bottom:calc(12px + var(--safe-b));transform:translateX(-50%);z-index:30;display:grid;grid-template-columns:repeat(6,1fr);width:min(520px,calc(100% - 24px));padding:6px;border-radius:24px;background:rgba(14,16,30,.78);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 20px 40px -10px rgba(0,0,0,.8)}
 .nav button{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;font-size:11px;font-weight:600;color:var(--mut);transition:color .25s}
 .nav button.on{color:var(--g)}
 .nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -231,3 +231,14 @@ main{max-width:1180px;margin:0 auto;padding:14px 16px calc(110px + var(--safe-b)
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 @media (max-width:420px){.live .lbl{display:none}.live{padding:7px 10px}}
+
+/* Deney (lab) tab */
+.lab-hero .lab-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 6px}
+.lab-hero .lab-two>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04)}
+.lab-hero .lab-two label{font-size:11px;color:var(--mut)}
+.lab-hero .lab-two b{font-size:22px}
+.lab-hero .lab-two small{font-size:12px}
+.lab-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.08);margin-left:4px;vertical-align:middle}
+.lab-tag.short{background:rgba(255,77,109,.18)}.lab-tag.long{background:rgba(55,245,166,.15)}
+.lab-ake{border-left:3px solid #ffb84d}
+.nav button span{font-size:10px}

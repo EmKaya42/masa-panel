@@ -449,6 +449,37 @@ document.addEventListener("click", e => {
       grid: [["Giriş", fpx(x.entry)], ["Çıkış", fpx(x.exit)], ["PnL", (x.pnl > 0 ? "+" : "") + nf(x.pnl) + " USDT", cls(x.pnl)], ["Boyut", nf(x.size) + " USDT"], ["Ücret", nf(x.fees)], ["Neden", x.why]]}); }
 });
 
+/* ---------- deney (lab) ---------- */
+function renderLab() {
+  const L = D.lab; if (!L || L.error) return;
+  const S = L.sol, O = L.okx;
+  const eqLine = (b, x) => { const e = $(b); e.textContent = usd(x.eq); e.className = "num " + cls(x.eq - x.start); };
+  eqLine("#labSolEq", S); eqLine("#labOkxEq", O);
+  $("#labSolSub").textContent = `${S.n} işlem · ${S.wins} kazanan · net ${sgnUsd(S.net)}`;
+  $("#labOkxSub").textContent = `${O.n} işlem · ${O.wins} kazanan · net ${sgnUsd(O.net)}`;
+  const st = $("#labStatus"); const halted = S.halted || O.halted; st.textContent = halted ? "GÜNLÜK LİMİT" : "ÇALIŞIYOR"; st.className = "chip" + (halted ? " red" : "");
+  $("#labSet").textContent = L.settings; $("#labOSet").textContent = L.osettings;
+  const sc = O.scan; $("#labScan").textContent = sc ? `OKX: ${sc.universe} enstrüman (${sc.spot} spot, ${sc.perp} vadeli) · ${sc.time.slice(11, 16)} · Solana tur ${S.passes}` : "";
+  const tag = (t, c) => `<span class="lab-tag ${c || ""}">${esc(t)}</span>`;
+  const rows = [];
+  for (const p of S.pos) rows.push(`<div class="row glass"><div class="a">${esc(p.sym)}${tag("Solana")}</div><div class="b num ${cls(p.pnl)}">${sgnUsd(p.pnl)}</div><div class="c">${fpx(p.entry)} → ${fpx(p.last)}${p.armed ? " · trailing" : ""}</div><div class="d num ${cls(p.chg)}">${pct(p.chg, 1)}</div></div>`);
+  for (const p of O.pos) rows.push(`<div class="row glass"><div class="a">${esc(p.inst.replace("-USDT-SWAP", " perp").replace("-USDT", " spot"))}${tag(p.side, p.side)}${tag(p.lev + "x")}</div><div class="b num ${cls(p.pnl)}">${sgnUsd(p.pnl)}</div><div class="c">${fpx(p.entry)} → ${fpx(p.last)} · stop ${fpx(p.stop)}${p.liq ? " · tasfiye " + fpx(p.liq) : ""}</div><div class="d num ${cls(p.chg)}">${pct(p.chg, 1)}</div></div>`);
+  $("#labPos").innerHTML = rows.join("") || `<div class="empty">Açık pozisyon yok</div>`;
+  const tr = [...S.trades.map(t => ({...t, name: t.sym, book: "Solana"})), ...O.trades.map(t => ({...t, name: t.inst.replace("-USDT-SWAP", " perp").replace("-USDT", " spot"), book: t.side + " " + t.lev + "x"}))].sort((a, b) => b.xts - a.xts).slice(0, 20);
+  $("#labTrades").innerHTML = tr.map(t => `<div class="row glass"><div class="a">${esc(t.name)}${tag(t.book)} <small>${hm(t.xts)}</small></div><div class="b num ${cls(t.pnl)}">${sgnUsd(t.pnl)}</div><div class="c">${esc(t.why)}</div><div class="d num ${cls(t.pct)}">${pct(t.pct, 1)}</div></div>`).join("") || `<div class="empty">Henüz kapanan işlem yok</div>`;
+  $("#labCls").textContent = Object.entries(L.classes || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
+  $("#labPm").innerHTML = (L.pm || []).map(x => `<div class="row glass"><div class="a">${esc(x.id)}${tag(x.book)}${tag(x.side, x.side)}</div><div class="b num ${cls(x.pnl)}">${sgnUsd(x.pnl)}</div><div class="c">${esc(x.cls)}${x.lesson ? " — " + esc(x.lesson) : ""}</div><div class="d num muted">MFE ${pct(x.mfe, 0)} / MAE ${pct(x.mae, 0)}</div></div>`).join("") || `<div class="empty">Kapanan her işlem burada nedeniyle görünecek</div>`;
+  const M = L.missed;
+  if (M) {
+    $("#labMissTs").textContent = `${M.date} · ${hm(M.gen)}`;
+    const a = M.ake;
+    $("#labAke").innerHTML = a ? `<div class="card glass lab-ake"><div class="card-h">AKE (OKX, yalnızca vadeli)</div><div>Gün açılışı ${fpx(a.open)} → zirve ${fpx(a.high)} (${esc(a.high_time)}) · şimdi ${fpx(a.last)}</div><div class="num"><b class="up">${pct(a.up, 1)}</b> açılıştan zirveye · <b class="${cls(a.move)}">${pct(a.move, 1)}</b> açılıştan şimdiye · 24 sa ${pct(a.chg24h, 1)}</div><div class="muted sm">Neden kaçtı: OKX spot masasının evreninde yoktu (yalnızca vadeli). Deney masası artık tüm OKX spot+vadeli enstrümanlarını izliyor.</div></div>` : "";
+    $("#labMiss").innerHTML = M.okx.map((m, i) => `<div class="row glass"><div class="a">${i + 1}. ${esc(m.inst.replace("-USDT-SWAP", " perp").replace("-USDT", " spot"))}</div><div class="b num up">${pct(m.up, 1)}</div><div class="c">${esc(m.why)}</div><div class="d num ${cls(m.move)}">${pct(m.move, 1)}</div></div>`).join("")
+      + M.ds.map((d, i) => `<div class="row glass"><div class="a">${i + 1}. ${esc(d.sym)}${tag("DexScreener")}</div><div class="b num up">${pct(d.h24, 0)}</div><div class="c">${esc(d.why)}</div><div class="d num muted">liq $${nf((d.liq || 0) / 1000, 0)}k</div></div>`).join("");
+    $("#labRules").innerHTML = M.rules.map(x => `<div class="row glass"><div class="a">${esc(x.rule)}</div><div class="b num ${cls(x.avg)}">${pct(x.avg, 2)} ort.</div><div class="c">${x.n} işlem · ${x.w} kazanan · yakaladığı: ${esc((x.caught || []).join(", ") || "—")}</div><div class="d num muted">${x.n ? nf(100 * x.w / x.n, 0) : 0}%</div></div>`).join("") + `<p class="hint">Bugünün OKX mumlarında oynatma: stop −%7, trailing +%13/%7, maliyet dahil. Tek günlük veri; kural değişikliği ≥30 ileriye dönük işlemden sonra.</p>`;
+  } else { $("#labMiss").innerHTML = `<div class="empty">Rapor saatlik üretiliyor</div>`; }
+}
+
 /* ---------- nav ---------- */
 function go(tab) {
   document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.dataset.tab === tab));
@@ -463,7 +494,7 @@ $("#nav").addEventListener("click", e => { const b = e.target.closest("button");
 $("#liveBtn").onclick = () => go("ekip");
 
 function seedOkx() { const s = D?.okx; if (!s?.t) return; for (const [b, x] of Object.entries(s.px || {})) if (!okx[b] || (okx[b].src === "masa" && okx[b].t < s.t)) okx[b] = {px: x[0], ch: x[1], vol: x[2] || 0, t: s.t, src: "masa"}; }
-function renderAll() { seedOkx(); renderMeme(); renderSpot(); renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
+function renderAll() { seedOkx(); renderMeme(); renderSpot(); try { renderLab(); } catch (e) { console.error(e); } renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
 
 /* ---------- boot ---------- */
 go((location.hash || "#masa").slice(1).replace(/[^a-z]/g, "") || "masa");
