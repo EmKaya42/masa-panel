@@ -9,7 +9,7 @@
 <meta name="robots" content="noindex">
 <title>Masa Paneli · Canlı (Sanal)</title>
 <link rel="preload" href="InterVariable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305060b'/%3E%3Cpath d='M10 44 L24 30 L34 38 L54 16' stroke='%2337f5a6' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -168,6 +168,33 @@
     <div id="labRules"></div>
   </section>
 
+  <!-- BALINA -->
+  <section class="tab" data-tab="balina">
+    <div class="card glass lab-hero">
+      <div class="hero-top"><span class="eyebrow">BALİNA TAKİBİ — canlı emir akışı (sanal)</span><span class="chip" id="whStatus">—</span></div>
+      <div class="lab-two">
+        <div><label>Veri kalitesi</label><b id="whQ" class="num">—</b><small id="whQs" class="num muted">—</small></div>
+        <div><label>Balina deney defteri</label><b id="whEq" class="num">—</b><small id="whEqs" class="num muted">—</small></div>
+      </div>
+      <p class="hint" id="whMeta"></p>
+      <div class="okx-note">OKX herkese açık WebSocket · OKX verisi, Binance değil · emir yok, anahtar yok, Telegram yok · taker alış/satış hacmi borsaya giren net para DEĞİLDİR</div>
+    </div>
+    <div class="sec-h"><h2>Balina uyarıları</h2><span class="muted sm" id="whAlTs"></span></div>
+    <div id="whAlerts"></div>
+    <p class="hint">Duvar çekilmesi, CVD uyumsuzluğu, funding/OI uyumsuzluğu ve likidite düşüşü yalnızca <b>şüpheli gösterge</b>dir; manipülasyon kanıtı değildir. Balina eşiği her coin için dinamik: işlem büyüklüğü dağılımının %99,5'i ve 1 sa hacmin %0,2'si (en az $25k).</p>
+    <div class="sec-h"><h2>Akıllı tarama (sıralama)</h2><span class="muted sm" id="whRkTs"></span></div>
+    <div id="whCoins"></div>
+    <p class="hint">Skor: balina aktivitesi, hacim artışı, CVD, likidite, trend gücü (ADX), OI, volatilite, spread ve risk/getiri; abone olunan coinler arasında yüzdelik sıralama.</p>
+    <div class="sec-h"><h2>AI balina analizi</h2><span class="muted sm">Veri ↔ Yorum (AI) ayrı</span></div>
+    <div id="whReps"></div>
+    <div class="sec-h"><h2>Strateji testleri (geçmiş veri)</h2><span class="muted sm" id="whBtTs"></span></div>
+    <div id="whBt"></div>
+    <div class="sec-h"><h2>Gölge sinyaller (ileri test)</h2></div>
+    <div id="whSh"></div>
+    <div class="sec-h"><h2>Deney defteri işlemleri</h2></div>
+    <div id="whTr"></div>
+  </section>
+
   <!-- AKIS -->
   <section class="tab" data-tab="akis">
     <div class="sec-h first"><h2>Uyarılar</h2></div>
@@ -183,6 +210,7 @@
   <button data-go="spot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 9h4.5a2 2 0 010 4H9h5a2 2 0 010 4H9M11 7v2M11 17v-2"/></svg><span>Spot</span></button>
   <button data-go="ekip"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 4.5a3 3 0 010 6M18 14c2 .8 3 2.8 3 6"/></svg><span>Ekip</span></button>
   <button data-go="deney"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3M7.5 14h9"/></svg><span>Deney</span></button>
+  <button data-go="balina"><svg viewBox="0 0 24 24"><path d="M3 13c2-4 6-6 10-5 3 .8 5 3 7 2-1 4-5 7-10 7-4 0-6-2-7-4zM17 6c1-1 2-1.5 3-1.5M17 6c0-1.2-.4-2.2-1-3"/></svg><span>Balina</span></button>
   <button data-go="akis"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>Akış</span></button>
   <i class="nav-ind" id="navInd"></i>
 </nav>
@@ -201,6 +229,6 @@
   <div class="sheet-note" id="shNote"></div>
 </div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

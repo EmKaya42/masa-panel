@@ -517,6 +517,39 @@ function renderLab() {
   } else { $("#labMiss").innerHTML = `<div class="empty">Rapor saatlik üretiliyor</div>`; }
 }
 
+
+/* ---------- balina ---------- */
+function renderWhale() {
+  const W = D.whale; if (!W) return;
+  const tag = (t, c) => `<span class="lab-tag ${c || ""}">${esc(t)}</span>`;
+  const k$ = v => v == null ? "—" : (v < 0 ? "-$" : "+$") + (Math.abs(v) >= 1e6 ? nf(Math.abs(v) / 1e6, 2) + "M" : nf(Math.abs(v) / 1000, 0) + "k");
+  const st = $("#whStatus"); st.textContent = W.safe ? "GÜVENLİ MOD" : "CANLI"; st.className = "chip" + (W.safe ? " red" : "");
+  const Q = W.q || {};
+  $("#whQ").textContent = Q.cov != null ? nf(Q.cov * 100, 1) + "%" : "—";
+  $("#whQs").textContent = `işlem kapsama (1 dk mum hacmine göre) · gecikme p50 ${Q.lat50 ?? "—"} ms / p95 ${Q.lat95 ?? "—"} ms · defter sıra hatası ${Q.seq_bad ?? 0} · yeniden bağlanma ${((Q.rc || {}).public || 0) + ((Q.rc || {}).business || 0)}`;
+  const P = W.paper || {}; $("#whEq").textContent = P.eq != null ? usd(P.eq) : "—"; $("#whEq").className = "num " + cls((P.eq || 0) - (P.start || 0));
+  $("#whEqs").textContent = (P.strats && P.strats.length) ? `kağıt işlem: ${P.strats.join(", ")}` : "OOS testini geçen strateji yok → işlem açılmıyor, hepsi gölgede";
+  $("#whMeta").textContent = `${W.n} enstrüman canlı izleniyor · BTC yönü: ${W.btc || "—"} · WS/REST karşılaştırma ${(Q.rest || []).map(x => x.s + " " + (x.r == null ? "—" : nf(x.r * 100, 1) + "%")).join(", ") || "bekleniyor"} · ${Q.pauses || 0} duraklama · ${hm(W.gen)}${W.safe ? " · " + (W.safe_why || "") : ""}${P.kill ? " · ACİL DURDURMA AKTİF" : ""}`;
+  $("#whAlTs").textContent = `${Q.alerts ?? 0} uyarı (bu oturum)`;
+  const sideCls = a => (a.side === "buy" || a.side === "bid" || a.side === "up") ? "long" : ((a.side === "sell" || a.side === "ask" || a.side === "down") ? "short" : "");
+  $("#whAlerts").innerHTML = (W.alerts || []).slice(0, 18).map(a => `<div class="row glass"><div class="a">${esc(a.s)} ${tag(a.ti || a.ty, sideCls(a))} <small>${hm(a.t)}</small></div><div class="b num">${a.usd ? k$(a.usd).replace("+", "") : (a.x != null ? nf(a.x, 2) : "")}</div><div class="c">${a.note ? "⚠ " + esc(a.note) : esc(a.ty)}</div><div class="d">${a.sev >= 2 ? tag("önemli", "short") : ""}</div></div>`).join("") || `<div class="empty">Henüz uyarı yok</div>`;
+  $("#whRkTs").textContent = hm(W.gen);
+  $("#whCoins").innerHTML = (W.coins || []).map(c => `<div class="row glass"><div class="a">${esc(c.s)} ${tag(nf(c.rk, 0))}${c.wb ? tag(c.wb + " balina alış", "long") : ""}${c.wsl ? tag(c.wsl + " balina satış", "short") : ""}</div><div class="b num ${cls(c.d15)}">${k$(c.d15)}</div><div class="c">15 dk CVD · dengesizlik ${c.imb == null ? "—" : nf(c.imb * 100, 0) + "%"} · defter ${c.obi == null ? "—" : nf(c.obi * 100, 0) + "%"} · derinlik ±1% ${k$(c.dep).replace("+", "")} · spread ${c.sp ?? "—"} bp${c.oi != null ? " · OI 1sa " + pct(c.oi, 1) : ""}${c.fr != null ? " · funding " + nf(c.fr, 3) + "%" : ""}${c.vg != null ? " · hacim " + nf(c.vg, 1) + "x" : ""}</div><div class="d num ${cls(c.ch)}">${pct(c.ch, 1)}</div></div>`).join("");
+  $("#whReps").innerHTML = (W.reps || []).map(r => `<div class="card glass wh-rep"><div class="card-h">${esc(r.coin)} · ${fpx(r.px)} ${tag("risk: " + r.risk, r.risk === "Yüksek" ? "short" : (r.risk === "Düşük" ? "long" : ""))}</div>
+    <div class="wh-grid"><span>Balina aktivitesi</span><b>${esc(r.bal)}</b><span>Alış baskısı</span><b>${esc(r.al)}</b><span>Satış baskısı</span><b>${esc(r.sat)}</b><span>CVD</span><b>${esc(r.cvd)}</b><span>Likidite</span><b>${esc(r.liq)}</b><span>Trend</span><b>${esc(r.tr)}</b></div>
+    <div class="muted sm">Veri: RSI15 ${r.data.rsi15 ?? "—"} · ATR 1sa ${r.data.atr1h ?? "—"}% · ADX ${r.data.adx ?? "—"} · funding ${r.data.fr ?? "—"}% · OI 1sa ${r.data.oi1h ?? "—"}% · BTC ${esc(r.data.btc || "—")}</div>
+    <div class="wh-ai"><b>Yorum (AI · kural tabanlı)</b><ul>${(r.sc || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul><details><summary>Analiz gerekçesi</summary><ul>${(r.why || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></details></div></div>`).join("") || `<div class="empty">Analiz her dakika üretiliyor</div>`;
+  const B = W.bt || {}, nmS = {whale_momentum: "Balina momentumu", cvd_divergence: "CVD uyumsuzluğu", volume_breakout: "Hacim kırılımı", liquidity_sweep: "Likidite süpürme", oi_momentum: "OI momentumu"};
+  $("#whBtTs").textContent = B.per ? `${B.syms} vadeli · ${B.per.start.slice(5, 10)} → ${B.per.end.slice(5, 10)} · 1 sa` : "";
+  $("#whBt").innerHTML = (B.s || []).map(x => `<div class="row glass"><div class="a">${esc(nmS[x.k] || x.k)} ${tag(x.p ? "GEÇTİ → kağıt" : "geçmedi → gölge", x.p ? "long" : "short")}</div><div class="b num ${cls(x.oos?.mean)}">${x.oos?.mean == null ? "—" : pct(x.oos.mean, 2)}</div><div class="c">örneklem dışı ${x.oos?.n ?? 0} işlem · kazanma ${x.oos?.win ?? "—"}% · PF ${x.oos?.pf ?? "—"} | eğitim ${x.is?.mean == null ? "—" : pct(x.is.mean, 2)} (${x.is?.n ?? 0})</div><div class="d num muted">işlem başı net</div></div>`).join("")
+    + `<div class="row glass"><div class="a">Emir defteri dengesizliği ${tag("yalnız ileri test", "")}</div><div class="b num muted">—</div><div class="c">OKX geçmiş emir defteri vermiyor; canlı gölge sinyal olarak ölçülüyor</div><div class="d"></div></div>`
+    + `<p class="hint">Maliyet dahil (komisyon %0,05 + kayma %0,03 + gecikme %0,02 + yarım spread, her yön) + funding. Sinyal mum kapanışında, giriş sonraki mumun açılışında (geleceğe bakma yok). Geçiş şartı: ${esc(B.gate || "")}.</p>`;
+  const SH = W.shadow || {}, nm2 = {...nmS, order_flow_imbalance: "Emir defteri dengesizliği"};
+  const shRows = Object.entries(SH).map(([k, v]) => { const h = v.h4 || v.h1 || v["h0.25"]; const lbl = v.h4 ? "4 sa" : (v.h1 ? "1 sa" : "15 dk"); return `<div class="row glass"><div class="a">${esc(nm2[k] || k)} ${tag(v.mode === "paper" ? "kağıt" : "gölge")}</div><div class="b num ${cls(h?.mean_net_pct)}">${h ? pct(h.mean_net_pct, 2) : "—"}</div><div class="c">${v.n} sinyal · ${h ? lbl + " sonra, " + h.n + " ölçüm, kazanma " + h.win_pct + "%" : "sonuç bekleniyor"}</div><div class="d"></div></div>`; }).join("");
+  $("#whSh").innerHTML = shRows + (W.sigs || []).map(x => `<div class="row glass"><div class="a">${esc(x.s)} ${tag(x.side, x.side)} <small>${hm(x.t)}</small></div><div class="b num muted">${esc(x.m)}</div><div class="c">${esc(nm2[x.st] || x.st)}</div><div class="d"></div></div>`).join("") || `<div class="empty">Henüz sinyal yok</div>`;
+  $("#whTr").innerHTML = (P.pos || []).map(p => `<div class="row glass"><div class="a">${esc(p.s)} ${tag(p.side, p.side)}${tag(p.lev + "x")}</div><div class="b num">${fpx(p.l)}</div><div class="c">${esc(p.st)} · giriş ${fpx(p.e)} · $${nf(p.n, 0)}</div><div class="d"></div></div>`).join("")
+    + (P.trades || []).map(t => `<div class="row glass"><div class="a">${esc(t.s)} ${tag(t.ev === "entry" ? "giriş" : "çıkış")} <small>${hm(t.t)}</small></div><div class="b num ${cls(t.pnl)}">${t.pnl == null ? "" : sgnUsd(t.pnl)}</div><div class="c">${esc(t.st)}${t.why ? " · " + esc(t.why) : ""}</div><div class="d"></div></div>`).join("") || `<div class="empty">Kağıt işlem yok (geçen strateji yok)</div>`;
+}
 /* ---------- nav ---------- */
 function go(tab) {
   document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.dataset.tab === tab));
@@ -531,7 +564,7 @@ $("#nav").addEventListener("click", e => { const b = e.target.closest("button");
 $("#liveBtn").onclick = () => go("ekip");
 
 function seedOkx() { const s = D?.okx; if (!s?.t) return; for (const [b, x] of Object.entries(s.px || {})) if (!okx[b] || (okx[b].src === "masa" && okx[b].t < s.t)) okx[b] = {px: x[0], ch: x[1], vol: x[2] || 0, t: s.t, src: "masa"}; }
-function renderAll() { seedOkx(); renderMeme(); renderSpot(); try { renderLab(); } catch (e) { console.error(e); } renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
+function renderAll() { seedOkx(); renderMeme(); renderSpot(); try { renderLab(); } catch (e) { console.error(e); } try { renderWhale(); } catch (e) { console.error(e); } renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
 
 /* ---------- boot ---------- */
 go((location.hash || "#masa").slice(1).replace(/[^a-z]/g, "") || "masa");
