@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05060b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="robots" content="noindex">
+<title>Masa Paneli · Canlı (Sanal)</title>
+<link rel="preload" href="InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305060b'/%3E%3Cpath d='M10 44 L24 30 L34 38 L54 16' stroke='%2337f5a6' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="bg"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="grid"></i></div>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 64 64"><path d="M10 44 L24 30 L34 38 L54 16"/></svg></div>
+    <div>
+      <div class="title">Masa Paneli</div>
+      <div class="sub"><span class="paper">SANAL (paper) — gerçek para yok</span></div>
+    </div>
+  </div>
+  <button class="live" id="liveBtn" title="Veri durumu">
+    <span class="dot"></span><span id="liveTxt">bağlanıyor</span>
+  </button>
+</header>
+
+<div class="tape" id="tape" aria-label="Canlı fiyat şeridi"><div class="tape-in" id="tapeIn"></div></div>
+
+<div class="stale hide" id="staleBar"></div>
+
+<main id="app">
+  <!-- MASA -->
+  <section class="tab on" data-tab="masa">
+    <div class="card hero glass">
+      <div class="hero-top">
+        <span class="eyebrow">Memecoin masası · Solana</span>
+        <span class="chip" id="memeStatus">—</span>
+      </div>
+      <div class="eq"><span class="cur">$</span><span id="eq" class="num">—</span></div>
+      <div class="eq-sub"><span id="pnl" class="num">—</span><span class="sep">·</span><span id="mult" class="num muted">—</span><span class="sep">·</span><span class="muted">başlangıç $<b id="start" class="num">—</b></span></div>
+      <div class="curve-wrap"><canvas id="curve" height="150"></canvas><div class="curve-tip" id="curveTip"></div></div>
+      <div class="kpis">
+        <div><label>Nakit</label><b id="cash" class="num">—</b></div>
+        <div><label>Bugün</label><b id="today" class="num">—</b></div>
+        <div><label>İşlem</label><b id="closed" class="num">—</b></div>
+        <div><label>Kazanma</label><b id="wr" class="num">—</b></div>
+      </div>
+      <div class="halt">
+        <div class="halt-h"><span>Günlük zarar limiti</span><span id="haltTxt" class="num">—</span></div>
+        <div class="bar"><i id="haltBar"></i></div>
+      </div>
+    </div>
+
+    <div class="rules" id="rules"></div>
+
+    <div class="cols"><div class="colA">
+    <div class="sec-h"><h2>Açık pozisyonlar</h2><span class="badge-live" id="posLive">DexScreener canlı</span></div>
+    <div id="positions"></div>
+
+    <div class="sec-h"><h2>Masa hattı</h2><span class="muted sm" id="pipeTs"></span></div>
+    <div class="pipe" id="pipe"></div>
+
+    <div class="grid2">
+      <div class="card glass">
+        <div class="card-h">Bugünkü huni</div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+      <div class="card glass">
+        <div class="card-h">En sık eleme nedenleri (bugün)</div>
+        <div class="kills" id="kills"></div>
+      </div>
+    </div>
+
+    </div><div class="colB">
+    <div class="sec-h"><h2>Kapanan işlemler</h2><span class="muted sm">dokun → gerçek mumlar</span></div>
+    <div id="trades"></div>
+    </div></div>
+  </section>
+
+  <!-- PIYASA -->
+  <section class="tab" data-tab="piyasa">
+    <div class="sec-h first"><h2>Spot piyasa</h2><span class="badge-live okx" id="okxBadge">OKX verisi, Binance değil</span></div>
+    <div class="tickers" id="tickers"></div>
+    <div class="sec-h"><h2>Memecoin radarı</h2><span class="badge-live" id="radarLive">DexScreener canlı</span></div>
+    <p class="hint">Gözcünün son bulduğu adaylar ve masanın kararı. Fiyatlar tarayıcında canlı çekilir; masa bunlarla işlem yapmadıysa sadece gözlemdir.</p>
+    <div id="radar"></div>
+  </section>
+
+  <!-- SPOT MASA -->
+  <section class="tab" data-tab="spot">
+    <div class="card glass stopped">
+      <div class="hero-top"><span class="eyebrow">Çoklu coin spot masası</span><span class="chip red" id="spotStatus">DURDURULDU</span></div>
+      <div class="eq sm"><span id="spotNet" class="num">—</span><span class="cur after">USDT net</span></div>
+      <div class="muted" id="spotStrat"></div>
+      <div class="kpis three">
+        <div><label>İşlem</label><b id="spotN" class="num">—</b></div>
+        <div><label>Kazanan</label><b id="spotW" class="num">—</b></div>
+        <div><label>Acil durdurma</label><b id="spotKill">—</b></div>
+      </div>
+      <div class="gate" id="spotGate"></div>
+      <div class="okx-note">OKX verisi, Binance değil · sadece spot, kaldıraç yok</div>
+    </div>
+    <div class="sec-h"><h2>Göstergeler (masanın son taraması)</h2><span class="muted sm" id="spotScanTs"></span></div>
+    <div class="ind" id="spotInd"></div>
+    <div class="sec-h"><h2>Kapanan işlemler</h2></div>
+    <div id="spotTrades"></div>
+  </section>
+
+  <!-- EKIP -->
+  <section class="tab" data-tab="ekip">
+    <div class="sec-h first"><h2>Ekip</h2><span class="muted sm">son rapor zamanı</span></div>
+    <div id="team"></div>
+    <div class="sec-h"><h2>Kutu sürekliliği</h2><span class="muted sm" id="boxSpan"></span></div>
+    <div class="card glass">
+      <div class="box-kpis">
+        <div><label>Çalışma oranı</label><b id="boxUp" class="num">—</b></div>
+        <div><label>Boşluk (&gt;2 dk)</label><b id="boxGaps" class="num">—</b></div>
+        <div><label>En uzun</label><b id="boxMax" class="num">—</b></div>
+      </div>
+      <canvas id="boxStrip" height="46"></canvas>
+      <p class="hint">Kırmızı çizgiler kutunun durduğu anlar (60 sn'lik nabız ölçümüne göre). 7/24 kesintisiz çalışma garantisi yok.</p>
+    </div>
+    <div class="sec-h"><h2>Veri kaynakları</h2></div>
+    <div class="card glass"><div class="srcs" id="srcs"></div></div>
+    <div class="sec-h"><h2>Bu panel</h2></div>
+    <div class="card glass about" id="about"></div>
+  </section>
+
+  <!-- AKIS -->
+  <section class="tab" data-tab="akis">
+    <div class="sec-h first"><h2>Uyarılar</h2></div>
+    <div id="alerts"></div>
+    <div class="sec-h"><h2>Canlı akış</h2><span class="muted sm">memecoin masası</span></div>
+    <div class="feed" id="feed"></div>
+  </section>
+</main>
+
+<nav class="nav" id="nav">
+  <button data-go="masa" class="on"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg><span>Masa</span></button>
+  <button data-go="piyasa"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg><span>Piyasa</span></button>
+  <button data-go="spot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 9h4.5a2 2 0 010 4H9h5a2 2 0 010 4H9M11 7v2M11 17v-2"/></svg><span>Spot</span></button>
+  <button data-go="ekip"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 4.5a3 3 0 010 6M18 14c2 .8 3 2.8 3 6"/></svg><span>Ekip</span></button>
+  <button data-go="akis"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>Akış</span></button>
+  <i class="nav-ind" id="navInd"></i>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="grab"></div>
+  <div class="sheet-h">
+    <div><div class="sheet-t" id="shT">—</div><div class="sheet-s" id="shS"></div></div>
+    <button class="x" id="shX" aria-label="Kapat">✕</button>
+  </div>
+  <div class="sheet-px"><span id="shPx" class="num">—</span><span id="shCh" class="num"></span></div>
+  <div class="tf" id="shTf"></div>
+  <div class="chart-wrap"><canvas id="shChart" height="260"></canvas><div class="chart-msg" id="shMsg"></div></div>
+  <div class="sheet-grid" id="shGrid"></div>
+  <div class="sheet-note" id="shNote"></div>
+</div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>
