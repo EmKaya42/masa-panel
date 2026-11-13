@@ -526,7 +526,7 @@ function renderWhale() {
   const st = $("#whStatus"); st.textContent = W.safe ? "GÜVENLİ MOD" : "CANLI"; st.className = "chip" + (W.safe ? " red" : "");
   const Q = W.q || {};
   $("#whQ").textContent = Q.cov != null ? nf(Q.cov * 100, 1) + "%" : "—";
-  $("#whQs").textContent = `işlem kapsama (1 dk mum hacmine göre) · gecikme p50 ${Q.lat50 ?? "—"} ms / p95 ${Q.lat95 ?? "—"} ms · defter sıra hatası ${Q.seq_bad ?? 0} · yeniden bağlanma ${((Q.rc || {}).public || 0) + ((Q.rc || {}).business || 0)}`;
+  $("#whQs").textContent = `işlem kapsama (1 dk mum hacmine göre) · gecikme p50 ${Q.lat50 ?? "—"} ms / p95 ${Q.lat95 ?? "—"} ms · defter sıra hatası ${Q.seq_bad ?? 0} · yeniden bağlanma ${Object.values(Q.rc || {}).reduce((a, b) => a + b, 0)} · ${Object.values(Q.ws || {}).filter(Boolean).length}/${Object.keys(Q.ws || {}).length} WS bağlı`;
   const P = W.paper || {}; $("#whEq").textContent = P.eq != null ? usd(P.eq) : "—"; $("#whEq").className = "num " + cls((P.eq || 0) - (P.start || 0));
   $("#whEqs").textContent = (P.strats && P.strats.length) ? `kağıt işlem: ${P.strats.join(", ")}` : "OOS testini geçen strateji yok → işlem açılmıyor, hepsi gölgede";
   $("#whMeta").textContent = `${W.n} enstrüman canlı izleniyor · BTC yönü: ${W.btc || "—"} · WS/REST karşılaştırma ${(Q.rest || []).map(x => x.s + " " + (x.r == null ? "—" : nf(x.r * 100, 1) + "%")).join(", ") || "bekleniyor"} · ${Q.pauses || 0} duraklama · ${hm(W.gen)}${W.safe ? " · " + (W.safe_why || "") : ""}${P.kill ? " · ACİL DURDURMA AKTİF" : ""}`;
