@@ -239,7 +239,12 @@ function updateRadarLive() {
 function renderSpot() {
   const s = D.spot; if (!s || s.error) return;
   const n = $("#spotNet"); n.textContent = (s.net > 0 ? "+" : "") + nf(s.net); n.className = "num " + cls(s.net);
-  $("#spotStatus").textContent = s.status; $("#spotStrat").textContent = s.strategy;
+  const chip = $("#spotStatus"); chip.textContent = s.status;
+  const stopped = s.status === "DURDURULDU";
+  chip.className = "chip" + (stopped ? " red" : " yel");
+  const card = chip.closest(".card"); if (card) card.classList.toggle("stopped", stopped);
+  $("#spotStrat").textContent = s.strategy;
+  const lab = $("#spotLabel"); if (lab) lab.textContent = s.label || "OKX verisi, Binance değil · sadece spot, kaldıraç yok";
   $("#spotN").textContent = s.n; $("#spotW").textContent = s.wins;
   const k = $("#spotKill"); k.textContent = s.kill ? "AÇIK" : "kapalı"; k.className = s.kill ? "dn" : "up";
   $("#spotGate").textContent = s.gate;
