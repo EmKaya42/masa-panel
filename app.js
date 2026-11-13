@@ -91,7 +91,7 @@ function tickStatus() {
   const b = $("#liveBtn"), t = $("#liveTxt"), bar = $("#staleBar");
   if (!D) { t.textContent = fetchErr || "bağlanıyor"; b.className = "live " + (fetchErr ? "bad" : "warn"); return; }
   const age = now() - D.gen;
-  t.textContent = "son güncelleme " + ago(age);
+  t.innerHTML = `<span class="lbl">son güncelleme </span>${ago(age)}`;
   b.className = "live" + (age > STALE_S * 3 ? " bad" : age > STALE_S ? " warn" : "");
   if (age > STALE_S) {
     bar.classList.remove("hide"); bar.classList.toggle("bad", age > STALE_S * 3);
@@ -111,14 +111,14 @@ function drawLine(cv, vals, opt = {}) {
   if (!vals || vals.length < 2) return null;
   const pad = opt.pad ?? 6, lo = Math.min(...vals, ...(opt.ref != null ? [opt.ref] : [])), hi = Math.max(...vals, ...(opt.ref != null ? [opt.ref] : []));
   const rng = hi - lo || Math.abs(hi) * 0.01 || 1;
-  const X = i => i / (vals.length - 1) * w, Y = v => pad + (1 - (v - lo) / rng) * (h - pad * 2);
+  const xs = opt.xs, X = xs ? (i => (xs[i] - xs[0]) / ((xs[xs.length - 1] - xs[0]) || 1) * (w - 6)) : (i => i / (vals.length - 1) * w), Y = v => pad + (1 - (v - lo) / rng) * (h - pad * 2);
   const col = opt.color || "#37f5a6";
   if (opt.ref != null) { c.strokeStyle = "rgba(255,255,255,.14)"; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(0, Y(opt.ref)); c.lineTo(w, Y(opt.ref)); c.stroke(); c.setLineDash([]); }
   c.beginPath(); vals.forEach((v, i) => i ? c.lineTo(X(i), Y(v)) : c.moveTo(X(i), Y(v)));
   c.lineWidth = opt.lw || 2; c.strokeStyle = col; c.lineJoin = "round"; c.shadowColor = col; c.shadowBlur = opt.glow ?? 10; c.stroke(); c.shadowBlur = 0;
   c.lineTo(w, h); c.lineTo(0, h); c.closePath();
   const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, col + "44"); g.addColorStop(1, col + "00"); c.fillStyle = g; c.fill();
-  if (opt.dot) { const x = X(vals.length - 1), y = Y(vals[vals.length - 1]); c.fillStyle = col; c.beginPath(); c.arc(x - 3, y, 3.5, 0, 7); c.fill(); }
+  if (opt.dot) { const x = X(vals.length - 1), y = Y(vals[vals.length - 1]); c.fillStyle = col; c.beginPath(); c.arc(Math.min(x, w - 4), y, 3.5, 0, 7); c.fill(); }
   return {X, Y};
 }
 
@@ -159,7 +159,7 @@ function renderMeme() {
       <div class="a">${esc(x.sym)} <small>${dhm(x.ts)} → ${hm(x.xts)}</small></div><div class="b ${cls(x.pnl)} num">${sgnUsd(x.pnl)}</div>
       <div class="c">${esc(x.why)}</div><div class="d num ${cls(x.pnl_pct)}">${pct(x.pnl_pct)}</div></div>`).join("") : `<div class="empty">Henüz kapanan işlem yok</div>`;
   // feed / alerts
-  $("#feed").innerHTML = m.feed.map(e => `<div class="fe glass ${esc(e.k)}"><div class="l1"><time>${hm(e.ts)}</time><span class="ag2">${esc(e.ag)}</span><b>${esc(e.ev)}</b>${e.sym ? `<span class="tag e">${esc(e.sym)}</span>` : ""}</div>${e.d ? `<div class="l2">${esc(e.d)}</div>` : ""}</div>`).join("");
+  $("#feed").innerHTML = m.feed.map(e => `<div class="fe glass ${esc(e.k)}"><div class="l1"><time>${hm(e.ts)}</time><span class="ag2">${esc(e.ag)}</span><b>${esc(e.ev)}${e.n > 1 ? ` <span class="muted">×${e.n}</span>` : ""}</b>${e.sym ? `<span class="tag e">${esc(e.sym)}</span>` : ""}</div>${e.d ? `<div class="l2">${e.n > 1 ? "son: " : ""}${esc(e.d)}</div>` : ""}</div>`).join("");
   $("#alerts").innerHTML = m.alerts.length ? m.alerts.map(a => `<div class="al">${esc(a)}</div>`).join("") : `<div class="empty">Uyarı yok <span class="em">Fiyat ayrışması, izleme sessizliği gibi durumlar burada görünür</span></div>`;
 }
 
@@ -169,12 +169,13 @@ function drawCurve() {
   const pts = m.curve.slice(); const lastEq = m.bal.eq;
   if (pts.length && pts[pts.length - 1][0] < D.gen) pts.push([D.gen, lastEq]);
   const vals = pts.map(p => p[1]); const col = lastEq >= m.bal.start ? "#37f5a6" : "#ff4d6d";
-  const r = drawLine(cv, vals, {color: col, ref: m.bal.start, dot: true, h: 150, pad: 14});
+  const r = drawLine(cv, vals, {color: col, ref: m.bal.start, dot: true, h: 150, pad: 14, xs: pts.map(p => p[0])});
   curvePts = {pts, r};
 }
 $("#curve").addEventListener("pointermove", e => {
   if (!curvePts?.r) return; const cv = e.currentTarget, rect = cv.getBoundingClientRect();
-  const i = Math.round((e.clientX - rect.left) / rect.width * (curvePts.pts.length - 1)); const p = curvePts.pts[Math.max(0, Math.min(i, curvePts.pts.length - 1))];
+  const P = curvePts.pts, tx = P[0][0] + (e.clientX - rect.left) / rect.width * (P[P.length - 1][0] - P[0][0]);
+  let p = P[0]; for (const q of P) { if (q[0] <= tx) p = q; else break; }
   const tip = $("#curveTip"); tip.style.opacity = 1; tip.style.left = Math.min(rect.width - 140, Math.max(0, e.clientX - rect.left - 60)) + "px";
   tip.textContent = `${dhm(p[0])} · ${usd(p[1])}`;
 });
@@ -294,7 +295,7 @@ function updTicker(b) {
   const o = okx[b], p = $("#tp-" + b); if (!o || !p) return;
   const prev = p._v; p._v = o.px; setTxt(p, fpx(o.px), prev != null && prev !== o.px ? Math.sign(o.px - prev) : 0);
   const c = $("#tc-" + b); c.textContent = pct(o.ch); c.className = cls(o.ch);
-  $("#tv-" + b).textContent = "$" + nf(o.vol / 1e6, 1) + "M";
+  $("#tv-" + b).textContent = o.src === "masa" ? "masa verisi · " + hm(o.t) : "$" + nf(o.vol / 1e6, 1) + "M";
 }
 function drawSpark(b) { const cv = $("#ts-" + b), s = spark[b]; if (!cv || !s) return; const v = s.slice(); if (okx[b]) v[v.length - 1] = okx[b].px; drawLine(cv, v, {color: v[v.length - 1] >= v[0] ? "#37f5a6" : "#ff4d6d", h: 38, lw: 1.6, glow: 6, pad: 3}); }
 function updTape() {
@@ -305,23 +306,23 @@ function updTape() {
 }
 
 function onOkxTicker(x) {
-  const b = x.instId.split("-")[0], px = +x.last, op = +x.sodUtc0 ? +x.open24h : +x.open24h;
-  okx[b] = {px, ch: op ? (px / op - 1) * 100 : 0, vol: +x.volCcy24h || 0, t: now()}; okxOk = now();
+  const b = x.instId.split("-")[0], px = +x.last, op = +x.open24h;
+  okx[b] = {px, ch: op ? (px / op - 1) * 100 : 0, vol: +x.volCcy24h || 0, t: now(), src: x.src || "okx"}; if (!x.src) okxOk = now();
   updTicker(b); if (sheet.kind === "okx" && sheet.base === b) sheetLivePx(px, okx[b].ch);
 }
 let ws = null, wsFails = 0, wsPing = null, restTimer = null;
 function okxWS() {
-  try { ws = new WebSocket("wss://ws.okx.com:8443/ws/v5/public"); } catch (e) { return okxREST(); }
+  try { ws = new WebSocket("wss://ws.okx.com/ws/v5/public"); } catch (e) { return okxREST(); }
   const to = setTimeout(() => { if (ws.readyState !== 1) { ws.close(); } }, 8000);
   ws.onopen = () => { clearTimeout(to); wsFails = 0; okxMode = "ws"; ws.send(JSON.stringify({op: "subscribe", args: watch().map(b => ({channel: "tickers", instId: b + "-USDT"}))}));
-    clearInterval(wsPing); wsPing = setInterval(() => ws.readyState === 1 && ws.send("ping"), 20e3); clearInterval(restTimer); restTimer = null; };
+    clearInterval(wsPing); wsPing = setInterval(() => ws.readyState === 1 && ws.send("ping"), 20e3); };
   ws.onmessage = e => { if (e.data === "pong") return; try { const j = JSON.parse(e.data); (j.data || []).forEach(onOkxTicker); } catch (_) {} };
-  ws.onclose = () => { clearInterval(wsPing); wsFails++; if (wsFails >= 3) okxREST(); setTimeout(okxWS, Math.min(60e3, 2e3 * 2 ** wsFails)); };
+  ws.onclose = () => { clearInterval(wsPing); wsFails++; setTimeout(okxWS, Math.min(60e3, 2e3 * 2 ** wsFails)); };
   ws.onerror = () => {};
 }
 function okxREST() {
-  okxMode = "rest"; if (restTimer) return;
-  const run = async () => { await Promise.all(watch().map(async b => { try { const [j] = await getJSON(`https://www.okx.com/api/v5/market/ticker?instId=${b}-USDT`); j.data?.[0] && onOkxTicker(j.data[0]); } catch (_) {} })); updTape(); };
+  if (restTimer) return;
+  const run = async () => { if (okxMode === "ws" && ws?.readyState === 1 && now() - okxOk < 15) return; okxMode = "rest"; await Promise.all(watch().map(async b => { try { const [j] = await getJSON(`https://www.okx.com/api/v5/market/ticker?instId=${b}-USDT`); j.data?.[0] && onOkxTicker(j.data[0]); } catch (_) {} })); updTape(); };
   run(); restTimer = setInterval(run, OKX_POLL);
 }
 async function pollSparks() {
@@ -355,7 +356,8 @@ async function pollDex() {
 /* ---------- sheet with real candles ---------- */
 const sheet = {kind: null};
 function openSheet(o) {
-  Object.assign(sheet, {kind: null, mint: null, base: null, pair: null, marks: [], tf: null, tfs: [], c: null}, o);
+  for (const k of Object.keys(sheet)) delete sheet[k];
+  Object.assign(sheet, {kind: null, mint: null, base: null, pair: null, inst: null, marks: [], tf: null, tfs: [], c: null, until: null, fixed: false}, o);
   $("#shT").textContent = o.title; $("#shS").textContent = o.sub || ""; $("#shPx").textContent = o.px != null ? fpx(o.px) : "—"; $("#shCh").textContent = "";
   $("#shGrid").innerHTML = (o.grid || []).map(([k, v, c]) => `<div><label>${esc(k)}</label><b class="num ${c || ""}">${esc(v)}</b></div>`).join("");
   $("#shNote").innerHTML = o.note || "";
@@ -451,15 +453,17 @@ document.addEventListener("click", e => {
 function go(tab) {
   document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.dataset.tab === tab));
   const btns = [...document.querySelectorAll(".nav button")]; btns.forEach(b => b.classList.toggle("on", b.dataset.go === tab));
-  const i = btns.findIndex(b => b.dataset.go === tab), ind = $("#navInd"), bw = btns[0].offsetWidth;
-  ind.style.width = bw + "px"; ind.style.transform = `translateX(${i * bw}px)`;
+  placeInd();
   history.replaceState(null, "", "#" + tab); window.scrollTo({top: 0, behavior: "smooth"});
   if (D) requestAnimationFrame(() => { drawCurve(); drawStrip(); watch().forEach(drawSpark); });
 }
+function placeInd() { const b = document.querySelector(".nav button.on"), ind = $("#navInd"); if (!b) return; ind.style.width = b.offsetWidth + "px"; ind.style.transform = `translateX(${b.offsetLeft - 6}px)`; }
+window.addEventListener("resize", placeInd); document.fonts?.ready.then(placeInd);
 $("#nav").addEventListener("click", e => { const b = e.target.closest("button"); b && go(b.dataset.go); });
 $("#liveBtn").onclick = () => go("ekip");
 
-function renderAll() { renderMeme(); renderSpot(); renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
+function seedOkx() { const s = D?.okx; if (!s?.t) return; for (const [b, x] of Object.entries(s.px || {})) if (!okx[b] || (okx[b].src === "masa" && okx[b].t < s.t)) okx[b] = {px: x[0], ch: x[1], vol: x[2] || 0, t: s.t, src: "masa"}; }
+function renderAll() { seedOkx(); renderMeme(); renderSpot(); renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
 
 /* ---------- boot ---------- */
 go((location.hash || "#masa").slice(1).replace(/[^a-z]/g, "") || "masa");
@@ -467,7 +471,7 @@ loadData(); setInterval(loadData, DATA_POLL);
 setInterval(tickStatus, 1e3);
 setInterval(pollDex, DEX_POLL);
 setInterval(() => { if (D) renderTeam(); }, 30e3);
-okxWS(); pollSparks(); setInterval(pollSparks, SPARK_POLL);
+okxWS(); setTimeout(okxREST, 4e3); pollSparks(); setInterval(pollSparks, SPARK_POLL);
 renderTickers();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadData(); pollDex(); } });
 })();
