@@ -473,6 +473,30 @@ function renderLab() {
   for (const p of S.pos) rows.push(`<div class="row glass"><div class="a">${esc(p.sym)}${tag("Solana")}${p.src && p.src !== "BASE" ? tag(p.src) : ""}</div><div class="b num ${cls(p.pnl)}">${sgnUsd(p.pnl)}</div><div class="c">${fpx(p.entry)} → ${fpx(p.last)}${p.armed ? " · trailing" : ""}</div><div class="d num ${cls(p.chg)}">${pct(p.chg, 1)}</div></div>`);
   for (const p of O.pos) rows.push(`<div class="row glass"><div class="a">${esc(p.inst.replace("-USDT-SWAP", " perp").replace("-USDT", " spot"))}${tag(p.side, p.side)}${tag(p.lev + "x")}</div><div class="b num ${cls(p.pnl)}">${sgnUsd(p.pnl)}</div><div class="c">${fpx(p.entry)} → ${fpx(p.last)} · stop ${fpx(p.stop)}${p.liq ? " · tasfiye " + fpx(p.liq) : ""}</div><div class="d num ${cls(p.chg)}">${pct(p.chg, 1)}</div></div>`);
   $("#labPos").innerHTML = rows.join("") || `<div class="empty">Açık pozisyon yok</div>`;
+  const Q = L.quant;
+  if (Q) {
+    const F = Q.flow, k$ = v => v == null ? "—" : (v < 0 ? "-$" : "+$") + nf(Math.abs(v) / 1000, 0) + "k";
+    if (F) {
+      $("#labFlowTs").textContent = hm(F.gen);
+      $("#labFlow").innerHTML = F.rows.map(x => `<div class="row glass"><div class="a">${esc(x.s)}${x.pos ? tag("pozisyon " + x.pos, x.pos) : ""}${x.adv ? tag("ters akış", "short") : ""}</div><div class="b num ${cls(x.net15)}">${k$(x.net15)}</div><div class="c">15 dk dengesizlik ${x.imb == null ? "—" : nf(x.imb * 100, 0) + "%"} · 1 sa ${k$(x.net1h)}${x.doi != null ? " · OI " + pct(x.doi, 1) : ""}${x.big_b || x.big_s ? " · büyük al " + k$(x.big_b) + " / sat " + k$(-x.big_s) : ""}</div><div class="d num muted">${x.fund == null ? "" : "funding " + nf(x.fund, 3) + "%"}</div></div>`).join("")
+        + (F.sol || []).map(x => `<div class="row glass"><div class="a">${esc(x.s)}${tag("Solana")}</div><div class="b num ${cls(x.net15)}">${k$(x.net15)}</div><div class="c">15 dk dengesizlik ${nf((x.imb || 0) * 100, 0)}% · büyük işlem ${x.big}</div><div class="d"></div></div>`).join("");
+      $("#labWhale").innerHTML = (F.alerts || []).length ? F.alerts.map(a => `<div class="row glass"><div class="a">${esc(a.s)}${tag(a.type === "large_trade" ? "balina " + (a.side === "buy" ? "alış" : "satış") : "akış dengesizliği", a.side === "sell" || (a.usd < 0) ? "short" : "long")} <small>${esc(a.t)}</small></div><div class="b num">${k$(a.usd)}</div><div class="c">${esc(a.v)}${a.pos ? " · açık pozisyonumuz: " + esc(a.pos) : ""}</div><div class="d"></div></div>`).join("") : `<div class="empty">Henüz büyük işlem uyarısı yok</div>`;
+    }
+    const M2 = Q.ml;
+    if (M2) {
+      $("#labMlTs").textContent = `LightGBM · test AUC ${M2.auc ?? "—"}`;
+      const t = M2.terc || {};
+      $("#labMl").innerHTML = `<div class="row glass"><div class="a">Geçmiş test (${M2.n_test} aday)</div><div class="b num">${t.high ? nf(t.high.win_pct, 0) + "% / " + nf(t.low.win_pct, 0) + "%" : "—"}</div><div class="c">yüksek skorlu üçte bir vs düşük: kazanma oranı · ort. ${t.high ? pct(t.high.mean_ret_pct, 2) + " / " + pct(t.low.mean_ret_pct, 2) : ""}</div><div class="d num muted">gölge mod</div></div>`
+        + (M2.recent || []).map(x => `<div class="row glass"><div class="a">${esc((x.inst || "").replace("-USDT-SWAP", " perp").replace("-USDT", " spot"))}${tag(x.side, x.side)}${x.flag ? tag("sinyal") : ""}${x.in ? tag("girildi") : ""}</div><div class="b num">${nf((x.p || 0) * 100, 0)}%</div><div class="c">model kazanma olasılığı (işleme karışmaz)</div><div class="d"></div></div>`).join("");
+    }
+    const O2 = Q.opt;
+    if (O2) {
+      $("#labOptTs").textContent = `optuna · ${O2.syms} vadeli · ${esc((O2.gen || "").slice(11, 16))}`;
+      $("#labOpt").innerHTML = (O2.folds || []).map(f => `<div class="row glass"><div class="a">Dönem ${f.k} (test, örneklem dışı)</div><div class="b num ${cls(f.ob)}">${pct(f.ob, 1)}</div><div class="c">optimize ${f.on} işlem · mevcut kural ${pct(f.oc, 1)} (${f.ocn} işlem)</div><div class="d"></div></div>`).join("") + `<p class="hint">${esc(O2.verdict || "")} · Sonuçlar otomatik uygulanmaz.</p>`;
+    }
+    const V = Q.risk_vetoes || [];
+    $("#labRisk").innerHTML = V.length ? V.map(v => `<div class="row glass"><div class="a">${esc((v.inst || "").replace("-USDT-SWAP", " perp").replace("-USDT", " spot"))} <small>${hm(v.ts)}</small></div><div class="b num muted">veto</div><div class="c">${esc(v.why)}</div><div class="d"></div></div>`).join("") : `<div class="empty">Portföy limiti henüz bir girişi engellemedi</div>`;
+  }
   const tr = [...S.trades.map(t => ({...t, name: t.sym, book: t.src && t.src !== "BASE" ? "Solana " + t.src : "Solana"})), ...O.trades.map(t => ({...t, name: t.inst.replace("-USDT-SWAP", " perp").replace("-USDT", " spot"), book: t.side + " " + t.lev + "x"}))].sort((a, b) => b.xts - a.xts).slice(0, 20);
   $("#labTrades").innerHTML = tr.map(t => `<div class="row glass"><div class="a">${esc(t.name)}${tag(t.book)} <small>${hm(t.xts)}</small></div><div class="b num ${cls(t.pnl)}">${sgnUsd(t.pnl)}</div><div class="c">${esc(t.why)}</div><div class="d num ${cls(t.pct)}">${pct(t.pct, 1)}</div></div>`).join("") || `<div class="empty">Henüz kapanan işlem yok</div>`;
   $("#labCls").textContent = Object.entries(L.classes || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
