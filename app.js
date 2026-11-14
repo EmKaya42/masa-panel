@@ -3,6 +3,7 @@
    Canlı fiyat: DexScreener (Solana), OKX (spot; Binance verisi değil). Mumlar: GeckoTerminal / OKX. */
 (() => {
 "use strict";
+const Core = window.MasaCore;
 const REPO = "EmKaya42/masa-panel";
 const API_URL = `https://api.github.com/repos/${REPO}/contents/data.json?ref=data`;
 const RAW_URL = `https://raw.githubusercontent.com/${REPO}/data/data.json`;
@@ -12,6 +13,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 let D = null, dataSrc = "", rawUntil = 0, lastFetchOk = 0, fetchErr = "";
+let loadingData = false;
+const renderErrors = {};
 const dex = {};            // mint -> {px, ch5, ch1, ch24, liq, pair, url, t}
 const okx = {};            // base -> {px, open24, ch, vol, t}
 const spark = {};          // base -> [close...]
@@ -67,36 +70,49 @@ async function getJSON(url, opt = {}, ms = 12000) {
 }
 
 async function loadData() {
+  if (loadingData) return;
+  loadingData = true;
+  try {
   let d = null;
   if (Date.now() > rawUntil) {
     try {
       const [j, r] = await getJSON(API_URL, {headers: {Accept: "application/vnd.github.raw+json"}, cache: "no-cache"});
-      d = j; dataSrc = "GitHub API";
+      d = Core.validateSnapshot(j); dataSrc = "GitHub API";
       const rem = +r.headers.get("x-ratelimit-remaining"), reset = +r.headers.get("x-ratelimit-reset");
       if (!isNaN(rem) && rem < 4 && reset) rawUntil = reset * 1000;
     } catch (e) {
+      fetchErr = e.message;
       if (e.status === 403 || e.status === 429) { const reset = +(e.r?.headers.get("x-ratelimit-reset")); rawUntil = reset ? reset * 1000 : Date.now() + 15 * 60e3; }
     }
   }
   if (!d) {
-    try { [d] = await getJSON(RAW_URL + "?t=" + Math.floor(Date.now() / 60e3), {cache: "no-cache"}); dataSrc = "raw.githubusercontent (≤5 dk önbellek)"; }
+    try { const [j] = await getJSON(RAW_URL + "?t=" + Math.floor(Date.now() / 60e3), {cache: "no-cache"}); d = Core.validateSnapshot(j); dataSrc = "raw.githubusercontent (≤5 dk önbellek)"; }
     catch (e) { fetchErr = "Veri alınamadı (" + (e.status || "ağ") + ")"; }
   }
   if (d && (!D || d.gen >= D.gen)) { D = d; lastFetchOk = now(); fetchErr = ""; renderAll(); pollDex(); }
+  else if (d && D && d.gen < D.gen) fetchErr = "Kaynak eski bir kayıt döndürdü; son geçerli veri korunuyor";
   tickStatus();
+  } finally { loadingData = false; }
 }
 
 /* ---------- status ---------- */
 function tickStatus() {
+  if (sheet.kind && !sheet.fixed) {
+    const current = Core.isFresh(sheet.quoteAt, now(), 60);
+    $("#shPx").classList.toggle("quote-stale", !current);
+    $("#shS").textContent = sheet.originalSub + " · " + (current ? "fiyat güncel" : sheet.quoteAt ? "son fiyat kaydı: " + dhm(sheet.quoteAt) : "güncel fiyat bekleniyor");
+  }
   const b = $("#liveBtn"), t = $("#liveTxt"), bar = $("#staleBar");
   if (!D) { t.textContent = fetchErr || "bağlanıyor"; b.className = "live " + (fetchErr ? "bad" : "warn"); return; }
   const age = now() - D.gen;
   t.innerHTML = `<span class="lbl">son güncelleme </span>${ago(age)}`;
   b.className = "live" + (age > STALE_S * 3 ? " bad" : age > STALE_S ? " warn" : "");
-  if (age > STALE_S) {
+  if (fetchErr || !Core.isFresh(D.gen, now(), STALE_S)) {
     bar.classList.remove("hide"); bar.classList.toggle("bad", age > STALE_S * 3);
-    bar.textContent = `Masa verisi ${dur(age)} eski. Kutu durmuş ya da yayıncı ağa ulaşamıyor olabilir; aşağıdaki masa rakamları ${hm(D.gen)} itibarıyla. Canlı fiyatlar tarayıcıdan gelmeye devam eder.`;
+    b.className = "live warn";
+    bar.textContent = fetchErr ? fetchErr + ". Son geçerli kayıt: " + dhm(D.gen) : age < 0 ? "Kaynak saati ileride; veri zamanı doğrulanamadı." : "Masa kaydı " + dur(age) + " eski · " + dhm(D.gen) + " itibarıyla. Durumlar ve bakiyeler bu kayda aittir. Fiyat bağlantıları ayrı izlenir.";
   } else bar.classList.add("hide");
+  window.MasaTerminal?.health(D, {dexOk,okxOk,dataSrc,lastFetchOk,fetchErr,renderErrors});
 }
 
 /* ---------- canvas ---------- */
@@ -165,7 +181,7 @@ function renderMeme() {
 
 let curvePts = null;
 function drawCurve() {
-  const m = D.meme, cv = $("#curve"); if (!m.curve?.length) return;
+  const m = D.meme, cv = $("#curve"); if (!m?.curve?.length || !m.bal) { ctx2d(cv,150); curvePts=null; return; }
   const pts = m.curve.slice(); const lastEq = m.bal.eq;
   if (pts.length && pts[pts.length - 1][0] < D.gen) pts.push([D.gen, lastEq]);
   const vals = pts.map(p => p[1]); const col = lastEq >= m.bal.start ? "#37f5a6" : "#ff4d6d";
@@ -182,7 +198,7 @@ $("#curve").addEventListener("pointermove", e => {
 $("#curve").addEventListener("pointerleave", () => $("#curveTip").style.opacity = 0);
 
 function posLive(p) {
-  const L = dex[p.mint]; const last = L?.px ?? p.last;
+  const quote = dex[p.mint], L = quote && Core.isFresh(quote.t, now(), 60) && Number.isFinite(quote.px) && quote.px > 0 ? quote : null; const last = L?.px ?? p.last;
   const val = p.qty * last * (1 - (D.meme.set.slip || 1.5) / 100);
   return {last, pnl: val - p.cost, pnl_pct: (val / p.cost - 1) * 100, live: !!L, ch5: L?.ch5};
 }
@@ -208,6 +224,7 @@ function updatePositionsLive() {
   if (!D?.meme?.pos) return;
   D.meme.pos.forEach((p, i) => {
     const L = posLive(p), el = $("#pl" + i); if (!el) return;
+    const label = el.closest('.pos').querySelectorAll('.pos-g label')[1]; if (label) label.textContent = L.live ? 'Şimdi · canlı' : 'Şimdi · masa kaydı';
     const prev = el._v; el._v = L.last;
     setTxt(el, fpx(L.last), prev != null && L.last !== prev ? Math.sign(L.last - prev) : 0);
     const pp = $("#pp" + i); pp.textContent = `${sgnUsd(L.pnl)} · ${pct(L.pnl_pct)}`; pp.className = "pnl num " + cls(L.pnl);
@@ -218,9 +235,9 @@ function updatePositionsLive() {
 
 /* ---------- radar ---------- */
 function renderRadar() {
-  const m = D?.meme; if (!m?.radar) return;
+  const m = D?.meme; if (!m?.radar) { $("#radar").innerHTML = '<div class="empty">Radar verisi son kayıtta bulunmuyor.</div>'; return; }
   $("#radar").innerHTML = m.radar.length ? m.radar.map((c, i) => {
-    const L = dex[c.mint]; const tg = c.vk === "kill" ? "k" : c.vk === "pass" || c.vk === "approve" || c.vk === "paper_entry" ? "p" : "w";
+    const q = dex[c.mint], L = q && Core.isFresh(q.t, now(), 60) ? q : null; const tg = c.vk === "kill" ? "k" : c.vk === "pass" || c.vk === "approve" || c.vk === "paper_entry" ? "p" : "w";
     return `<div class="row glass" data-radar="${i}"><div class="a">${esc(c.sym)} <span class="tag ${tg}">${esc(c.v)}</span></div>
       <div class="b num" id="rp${i}">${L ? "$" + fpx(L.px) : "—"}</div>
       <div class="c">${hm(c.ts)} · ${esc(c.vd || c.dex || "")}</div>
@@ -229,7 +246,7 @@ function renderRadar() {
 }
 function updateRadarLive() {
   D?.meme?.radar?.forEach((c, i) => {
-    const L = dex[c.mint], el = $("#rp" + i); if (!L || !el) return;
+    const q = dex[c.mint], L = q && Core.isFresh(q.t, now(), 60) ? q : null, el = $("#rp" + i); if (!el) return; if (!L) { el.textContent = "—"; $("#rc" + i).textContent = "Fiyat güncel değil"; return; }
     const prev = el._v; el._v = L.px; setTxt(el, "$" + fpx(L.px), prev != null && prev !== L.px ? Math.sign(L.px - prev) : 0);
     $("#rc" + i).innerHTML = `<span class="${cls(L.ch5)}">5dk ${pct(L.ch5, 1)}</span> · liq $${nf((L.liq || 0) / 1000, 0)}k`;
   });
@@ -246,7 +263,7 @@ function renderSpot() {
   $("#spotStrat").textContent = s.strategy;
   const lab = $("#spotLabel"); if (lab) lab.textContent = s.label || "OKX verisi, Binance değil · sadece spot, kaldıraç yok";
   $("#spotN").textContent = s.n; $("#spotW").textContent = s.wins;
-  const k = $("#spotKill"); k.textContent = s.kill ? "AÇIK" : "kapalı"; k.className = s.kill ? "dn" : "up";
+  const k = $("#spotKill"), kill = Core.killState(s.kill); k.textContent = kill.label; k.className = kill.tone;
   $("#spotGate").textContent = s.gate;
   $("#spotScanTs").textContent = s.scan_ts ? `${s.universe} parite · ${hm(s.scan_ts)}` : "";
   $("#spotInd").innerHTML = s.watch.filter(b => s.ind[b]).map(b => { const x = s.ind[b];
@@ -278,7 +295,7 @@ function renderTeam() {
     <p>Kutu durursa masa rakamları donar, sayfa bunu "eski veri" uyarısıyla gösterir. 7/24 kesintisiz çalışma ve getiri garantisi yoktur.</p>`;
 }
 function drawStrip() {
-  const b = D.box, cv = $("#boxStrip"); if (!b?.span_h) return;
+  const b = D.box, cv = $("#boxStrip"); if (!b?.span_h) { ctx2d(cv,46); return; }
   const [c, w, h] = ctx2d(cv, 46); const end = b.probe_last || D.gen, start = end - b.span_h * 3600;
   c.fillStyle = "rgba(55,245,166,.18)"; c.fillRect(0, 14, w, 18);
   c.fillStyle = "#ff4d6d"; c.shadowColor = "#ff4d6d"; c.shadowBlur = 8;
@@ -298,13 +315,14 @@ function renderTickers() {
 }
 function updTicker(b) {
   const o = okx[b], p = $("#tp-" + b); if (!o || !p) return;
+  p.classList.toggle("quote-stale", !Core.isFresh(o.t, now(), 60));
   const prev = p._v; p._v = o.px; setTxt(p, fpx(o.px), prev != null && prev !== o.px ? Math.sign(o.px - prev) : 0);
   const c = $("#tc-" + b); c.textContent = pct(o.ch); c.className = cls(o.ch);
   $("#tv-" + b).textContent = o.src === "masa" ? "masa verisi · " + hm(o.t) : "$" + nf(o.vol / 1e6, 1) + "M";
 }
 function drawSpark(b) { const cv = $("#ts-" + b), s = spark[b]; if (!cv || !s) return; const v = s.slice(); if (okx[b]) v[v.length - 1] = okx[b].px; drawLine(cv, v, {color: v[v.length - 1] >= v[0] ? "#37f5a6" : "#ff4d6d", h: 38, lw: 1.6, glow: 6, pad: 3}); }
 function updTape() {
-  const items = watch().filter(b => okx[b]).map(b => `<span><b>${b}</b><span class="num">${fpx(okx[b].px)}</span><span class="${cls(okx[b].ch)} num">${pct(okx[b].ch)}</span></span>`);
+  const items = watch().filter(b => okx[b]).map(b => `<span><b>${b}</b><span class="num">${(fpx(okx[b].px) + (Core.isFresh(okx[b].t, now(), 60) ? "" : " (eski)"))}</span><span class="${cls(okx[b].ch)} num">${pct(okx[b].ch)}</span></span>`);
   if (D?.meme) items.unshift(`<span><b>Memecoin masası</b><span class="num">$${nf(D.meme.bal.eq)}</span><span class="${cls(D.meme.bal.pnl_pct)} num">${pct(D.meme.bal.pnl_pct)}</span></span>`);
   items.push(`<span><b>OKX verisi</b><span>Binance değil</span></span>`, `<span><b>SANAL</b><span>gerçek para yok</span></span>`);
   const html = items.join(""); const t = $("#tapeIn"); if (t._h !== html) { t._h = html; t.innerHTML = html + html; }
@@ -347,34 +365,43 @@ async function pollDex() {
     const pairOf = {}; (D.meme.pos || []).forEach(p => pairOf[p.mint] = p.pair);
     const best = {};
     for (const p of arr || []) {
-      const m = p.baseToken?.address; if (!m) continue;
+      const m = p.baseToken?.address; if (!m || !Number.isFinite(+p.priceUsd) || +p.priceUsd <= 0) continue;
       const pref = pairOf[m] && p.pairAddress === pairOf[m];
       if (!best[m] || pref || (!best[m]._pref && (p.liquidity?.usd || 0) > (best[m].liquidity?.usd || 0))) { best[m] = p; p._pref = pref; }
     }
     for (const [m, p] of Object.entries(best)) dex[m] = {px: +p.priceUsd, ch5: p.priceChange?.m5, ch1: p.priceChange?.h1, ch24: p.priceChange?.h24, liq: p.liquidity?.usd, pair: p.pairAddress, url: p.url, mcap: p.marketCap, t: now()};
-    dexOk = now(); $("#posLive").classList.remove("off"); $("#radarLive").classList.remove("off");
+    if (Object.keys(best).length) dexOk = now(); $("#posLive").classList.remove("off"); $("#radarLive").classList.remove("off");
     updatePositionsLive(); updateRadarLive();
-    if (sheet.kind === "dex" && dex[sheet.mint]) { const L = dex[sheet.mint]; sheetLivePx(L.px, L.ch24, "24s"); }
+    if (sheet.kind === "dex" && !sheet.fixed && best[sheet.mint]) { const L = dex[sheet.mint]; sheetLivePx(L.px, L.ch24, "24s", L.t); }
   } catch (_) { if (now() - dexOk > 60) { $("#posLive").classList.add("off"); $("#radarLive").classList.add("off"); } }
 }
 
 /* ---------- sheet with real candles ---------- */
 const sheet = {kind: null};
+let sheetOpener = null;
 function openSheet(o) {
+  sheetOpener = document.activeElement;
   for (const k of Object.keys(sheet)) delete sheet[k];
   Object.assign(sheet, {kind: null, mint: null, base: null, pair: null, inst: null, marks: [], tf: null, tfs: [], c: null, until: null, fixed: false}, o);
+  $("#shPx").classList.remove("quote-stale");
+  sheet.quoteAt = o.quoteAt || null; sheet.originalSub = o.sub || "";
   $("#shT").textContent = o.title; $("#shS").textContent = o.sub || ""; $("#shPx").textContent = o.px != null ? fpx(o.px) : "—"; $("#shCh").textContent = "";
   $("#shGrid").innerHTML = (o.grid || []).map(([k, v, c]) => `<div><label>${esc(k)}</label><b class="num ${c || ""}">${esc(v)}</b></div>`).join("");
   $("#shNote").innerHTML = o.note || "";
   $("#shTf").innerHTML = sheet.tfs.map(t => `<button data-tf="${t[0]}" class="${t[0] === sheet.tf ? "on" : ""}">${t[1]}</button>`).join("");
   $("#sheet").classList.add("on"); $("#sheetBg").classList.add("on");
   loadCandles();
+  $("#sheet").setAttribute("aria-hidden", "false");
+  $("#sheet").inert = false;
+  document.querySelector("main").inert = true;
+  $("#nav").inert = true;
+  $("#shX").focus();
 }
-function closeSheet() { $("#sheet").classList.remove("on"); $("#sheetBg").classList.remove("on"); sheet.kind = null; }
+function closeSheet() { $("#sheet").classList.remove("on"); $("#sheetBg").classList.remove("on"); sheet.kind = null; sheet.tok = null; $("#sheet").setAttribute("aria-hidden", "true"); $("#sheet").inert = true; document.querySelector("main").inert = false; $("#nav").inert = false; sheetOpener?.focus(); }
 $("#shX").onclick = closeSheet; $("#sheetBg").onclick = closeSheet;
 document.addEventListener("keydown", e => e.key === "Escape" && closeSheet());
 $("#shTf").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; sheet.tf = b.dataset.tf; [...$("#shTf").children].forEach(x => x.classList.toggle("on", x === b)); loadCandles(); });
-function sheetLivePx(px, ch, lbl = "24s") { const el = $("#shPx"), prev = el._v; el._v = px; setTxt(el, fpx(px), prev != null && prev !== px ? Math.sign(px - prev) : 0); const c = $("#shCh"); c.textContent = ch != null ? `${lbl} ${pct(ch)}` : ""; c.className = "num " + cls(ch);
+function sheetLivePx(px, ch, lbl = "24s", quoteAt = now()) { sheet.quoteAt = quoteAt; const el = $("#shPx"), prev = el._v; el._v = px; setTxt(el, fpx(px), prev != null && prev !== px ? Math.sign(px - prev) : 0); const c = $("#shCh"); c.textContent = ch != null ? `${lbl} ${pct(ch)}` : ""; c.className = "num " + cls(ch);
   if (sheet.c?.length) { const last = sheet.c[sheet.c.length - 1]; if (!sheet.fixed) { last.c = px; last.h = Math.max(last.h, px); last.l = Math.min(last.l, px); drawCandles(); } } }
 
 async function loadCandles() {
@@ -431,7 +458,7 @@ const OKX_TF = [["15m", "15dk"], ["1H", "1sa"], ["4H", "4sa"], ["1D", "1g"]];
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-pos],[data-trade],[data-radar],[data-okx],[data-spot]"); if (!t || !D) return;
   if (t.dataset.pos != null) { const p = D.meme.pos[+t.dataset.pos], L = posLive(p);
-    openSheet({kind: "dex", title: p.sym, sub: "Açık sanal pozisyon · DexScreener canlı fiyat · GeckoTerminal mumları", mint: p.mint, pair: p.pair, px: L.last, tfs: DEX_TF, tf: "minute:1",
+    openSheet({kind: "dex", quoteAt: L.live ? dex[p.mint].t : D.gen, title: p.sym, sub: "Açık sanal pozisyon · GeckoTerminal mumları", mint: p.mint, pair: p.pair, px: L.last, tfs: DEX_TF, tf: "minute:1",
       marks: [{label: "giriş", y: p.entry, t: p.ts, col: "#4de2ff"}, {label: "stop", y: p.stop, col: "#ff4d6d"}, p.armed ? {label: "zirve", y: p.peak, col: "#ffd166"} : {label: "iz süren +%" + p.trail_on, y: p.entry * (1 + p.trail_on / 100), col: "#ffd166"}],
       grid: [["Giriş", fpx(p.entry)], ["Stop", fpx(p.stop)], ["PnL", `${sgnUsd(L.pnl)} (${pct(L.pnl_pct)})`, cls(L.pnl)], ["Boyut", usd(p.cost)], ["Skor", p.score ?? "—"], ["Açılış", dhm(p.ts)]],
       note: p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">DexScreener'da aç ↗</a> · PnL çıkışta %${D.meme.set.slip} kayma+ücret düşülerek hesaplanır` : ""}); }
@@ -440,14 +467,14 @@ document.addEventListener("click", e => {
       marks: [{label: "giriş", y: x.entry, t: x.ts, col: "#4de2ff"}, {label: "çıkış", y: x.exit, t: x.xts, col: x.pnl >= 0 ? "#37f5a6" : "#ff4d6d"}, {label: "stop", y: x.stop, col: "rgba(255,77,109,.6)"}],
       grid: [["Giriş", fpx(x.entry)], ["Çıkış", fpx(x.exit)], ["PnL", `${sgnUsd(x.pnl)} (${pct(x.pnl_pct)})`, cls(x.pnl)], ["Zirve", fpx(x.peak)], ["Boyut", usd(x.cost)], ["Neden", x.why]],
       note: (x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">DexScreener'da aç ↗</a> · ` : "") + "Mumlar GeckoTerminal'in gerçek verisi; giriş/çıkış noktaları masanın kayıtlı dolum fiyatları."}); }
-  else if (t.dataset.radar != null) { const c = D.meme.radar[+t.dataset.radar], L = dex[c.mint];
-    openSheet({kind: "dex", title: c.sym, sub: `Radar · masa kararı: ${c.v}`, mint: c.mint, pair: L?.pair, px: L?.px, tfs: DEX_TF, tf: "minute:5",
+  else if (t.dataset.radar != null) { const c = D.meme.radar[+t.dataset.radar], q = dex[c.mint], L = q && Core.isFresh(q.t, now(), 60) ? q : null;
+    openSheet({kind: "dex", quoteAt: L?.t, title: c.sym, sub: `Radar · masa kararı: ${c.v}`, mint: c.mint, pair: L?.pair, px: L?.px, tfs: DEX_TF, tf: "minute:5",
       grid: [["Mcap (bulunduğunda)", "$" + nf((c.mcap || 0) / 1000, 0) + "k"], ["Likidite", L ? "$" + nf(L.liq / 1000, 0) + "k" : "—"], ["1 sa", L ? pct(L.ch1, 1) : "—", cls(L?.ch1)], ["Bulundu", dhm(c.ts)], ["Yaş", (c.age_h ?? "?") + " sa"], ["Not", c.vd || "—"]],
       note: (L?.url ? `<a href="${esc(L.url)}" target="_blank" rel="noopener">DexScreener'da aç ↗</a> · ` : "") + "Sadece gözlem; masa bu coinde pozisyon açmadıysa sanal bakiye etkilenmez."}); }
   else if (t.dataset.okx) { const b = t.dataset.okx, o = okx[b], ind = D.spot?.ind?.[b];
-    openSheet({kind: "okx", title: b + "/USDT", sub: "OKX verisi, Binance değil · canlı WebSocket fiyatı", base: b, inst: b + "-USDT", px: o?.px, tfs: OKX_TF, tf: "15m",
+    openSheet({kind: "okx", quoteAt: o?.t, title: b + "/USDT", sub: "OKX spot · Binance verisi değil", base: b, inst: b + "-USDT", px: o?.px, tfs: OKX_TF, tf: "15m",
       grid: [["24 sa", o ? pct(o.ch) : "—", cls(o?.ch)], ["Hacim 24 sa", o ? "$" + nf(o.vol / 1e6, 1) + "M" : "—"], ["Trend (1sa EMA)", ind?.trend || "—"], ["RSI", ind ? nf(ind.rsi, 0) : "—"], ["ADX", ind ? nf(ind.adx, 0) : "—"], ["ATR", ind ? "%" + nf(ind.atr_pct, 1) : "—"]],
-      note: "Spot masa durduruldu; bu fiyatlar yalnızca izleme içindir."}); }
+      note: "Son kayıttaki spot durum: " + (D.spot?.status || "bilinmiyor") + ". Bu fiyatlar izleme içindir."}); }
   else if (t.dataset.spot != null) { const x = D.spot.trades[+t.dataset.spot];
     openSheet({kind: "okx", title: x.pair, sub: `Kapanan sanal işlem · OKX verisi, Binance değil`, inst: x.pair.replace("/", "-"), px: x.exit, fixed: true, until: x.xts + 4 * 3600, tfs: [["15m", "15dk"], ["1H", "1sa"]], tf: "15m",
       marks: [{label: "giriş", y: x.entry, t: x.ts, col: "#4de2ff"}, {label: "çıkış", y: x.exit, t: x.xts, col: x.pnl >= 0 ? "#37f5a6" : "#ff4d6d"}],
@@ -521,6 +548,7 @@ function renderLab() {
 /* ---------- balina ---------- */
 function renderWhale() {
   const W = D.whale; if (!W) return;
+  if (!Number.isFinite(W.gen)) throw Error('Balina veri zamanı bulunamadı');
   const tag = (t, c) => `<span class="lab-tag ${c || ""}">${esc(t)}</span>`;
   const k$ = v => v == null ? "—" : (v < 0 ? "-$" : "+$") + (Math.abs(v) >= 1e6 ? nf(Math.abs(v) / 1e6, 2) + "M" : nf(Math.abs(v) / 1000, 0) + "k");
   const st = $("#whStatus"); st.textContent = W.safe ? "GÜVENLİ MOD" : "CANLI"; st.className = "chip" + (W.safe ? " red" : "");
@@ -552,6 +580,7 @@ function renderWhale() {
 }
 /* ---------- nav ---------- */
 function go(tab) {
+  if (![...document.querySelectorAll(".tab")].some(s => s.dataset.tab === tab)) tab = "ozet";
   document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.dataset.tab === tab));
   const btns = [...document.querySelectorAll(".nav button")]; btns.forEach(b => b.classList.toggle("on", b.dataset.go === tab));
   placeInd();
@@ -561,18 +590,62 @@ function go(tab) {
 function placeInd() { const b = document.querySelector(".nav button.on"), ind = $("#navInd"); if (!b) return; ind.style.width = b.offsetWidth + "px"; ind.style.transform = `translateX(${b.offsetLeft - 6}px)`; }
 window.addEventListener("resize", placeInd); document.fonts?.ready.then(placeInd);
 $("#nav").addEventListener("click", e => { const b = e.target.closest("button"); b && go(b.dataset.go); });
+window.addEventListener("hashchange", () => go(location.hash.slice(1)));
 $("#liveBtn").onclick = () => go("ekip");
 
 function seedOkx() { const s = D?.okx; if (!s?.t) return; for (const [b, x] of Object.entries(s.px || {})) if (!okx[b] || (okx[b].src === "masa" && okx[b].t < s.t)) okx[b] = {px: x[0], ch: x[1], vol: x[2] || 0, t: s.t, src: "masa"}; }
-function renderAll() { seedOkx(); renderMeme(); renderSpot(); try { renderLab(); } catch (e) { console.error(e); } try { renderWhale(); } catch (e) { console.error(e); } renderTeam(); renderRadar(); renderTickers(); tickStatus(); }
+function renderSection(name, fn) {
+  const sections = {renderMeme:["masa","akis"],renderSpot:["spot"],renderLab:["deney"],renderWhale:["balina"]};
+  const required = {renderMeme:"meme",renderSpot:"spot",renderLab:"lab",renderWhale:"whale"};
+  let failed = false;
+  try {
+    const key = required[name];
+    if (key && (!D[key] || D[key].error || typeof D[key] !== "object")) throw Error("Masa verisi bulunamadı");
+    fn(); delete renderErrors[name];
+  } catch (e) { failed = true; renderErrors[name] = "Bu bölümün verisi eksik veya geçersiz"; console.error(name, e); }
+  for (const tab of sections[name] || []) {
+    const section = document.querySelector('[data-tab="'+tab+'"]');
+    if (!section) continue;
+    section.classList.toggle("section-unavailable", failed);
+    let placeholder = section.querySelector(".section-placeholder");
+    if (!placeholder) { placeholder = document.createElement("div"); placeholder.className = "section-placeholder empty"; section.prepend(placeholder); }
+    placeholder.textContent = "Bu masanın verisi son kayıtta eksik veya geçersiz. Önceki değerler gösterilmiyor. Sonraki güncellemede yeniden denenecek.";
+  }
+}
+function renderAll() { for (const fn of [seedOkx,renderMeme,renderSpot,renderLab,renderWhale,renderTeam,renderRadar,renderTickers]) renderSection(fn.name,fn); renderSection("overview",()=>window.MasaTerminal?.render(D)); enhanceCards(); tickStatus(); }
+function enhanceCards() {
+  document.querySelectorAll("[data-pos],[data-trade],[data-radar],[data-okx],[data-spot]").forEach(el => { el.tabIndex = 0; el.setAttribute("role", "button"); });
+}
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-pos],[data-trade],[data-radar],[data-okx],[data-spot]")) { e.preventDefault(); e.target.click(); }
+  if (e.key === "Tab" && sheet.kind) {
+    const focusable = [...$("#sheet").querySelectorAll('button,a[href]')], first = focusable[0], last = focusable[focusable.length-1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+$("#refreshBtn").onclick = () => loadData();
+setInterval(() => {
+  if (!D) return;
+  renderSection("positions", updatePositionsLive);
+  renderSection("radar-live", updateRadarLive);
+  watch().forEach(updTicker);
+  const dexFresh = Core.isFresh(dexOk, now(), 60);
+  $("#posLive").classList.toggle("off", !dexFresh); $("#radarLive").classList.toggle("off", !dexFresh);
+  $("#posLive").textContent = dexFresh ? "DexScreener · güncel" : "DexScreener · güncel değil";
+  $("#radarLive").textContent = $("#posLive").textContent;
+  $("#okxBadge").classList.toggle('off', !Core.isFresh(okxOk, now(), 60));
+  $("#okxBadge").textContent = Core.isFresh(okxOk, now(), 60) ? 'OKX · güncel' : 'OKX · güncel değil';
+}, 5e3);
 
 /* ---------- boot ---------- */
-go((location.hash || "#masa").slice(1).replace(/[^a-z]/g, "") || "masa");
+go((location.hash || "#ozet").slice(1).replace(/[^a-z]/g, "") || "masa");
 loadData(); setInterval(loadData, DATA_POLL);
 setInterval(tickStatus, 1e3);
 setInterval(pollDex, DEX_POLL);
-setInterval(() => { if (D) renderTeam(); }, 30e3);
+setInterval(() => { if (D) renderSection("renderTeam", renderTeam); }, 30e3);
 okxWS(); setTimeout(okxREST, 4e3); pollSparks(); setInterval(pollSparks, SPARK_POLL);
 renderTickers();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadData(); pollDex(); } });
 })();
+
